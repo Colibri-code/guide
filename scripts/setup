@@ -1,0 +1,73 @@
+#!/bin/bash
+readonly BIN="$(cd "$(dirname "$0")" && pwd -P)"
+readonly PROJECT="$(pwd)"
+readonly DIR="$BIN/$(dirname $(readlink "$0"))"
+
+# Display a confirmation message and return 0/1 based on the result.
+confirm() {
+	read -r -p "$1 [Y/n] " response
+	response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+
+	if [[ $response == "y" ]]; then
+	 return 0
+	fi
+
+	return 1
+}
+
+# Copy the given hook into the project and make the script executable.
+copy_hook() {
+	local hook=$1
+	cp $BIN/$hook $BIN/.git/hooks/$hook
+	chmod +x $BIN/.git/hooks/$hook
+	echo "Copying $hook hook"
+}
+
+# Trigger an error and exit, but also tell users how they can re-run the script.
+error() {
+	echo
+	echo "Error: $1" >&2
+	echo "You may re-run this setup at any time by running $BIN/setup"
+	echo
+	exit 1;
+}
+
+echo "Installing commit-msg hook..."
+ 
+# Check that the target Git repository exists
+if [[ ! -d $BIN/.git ]]; then
+	error "No .git directory found in your project, unable to copy Git hooks!"
+fi
+
+# Verify that the hooks/ directory exists within .git/
+if [[ ! -d $BIN/.git/hooks ]]; then
+	echo "Creating hooks/ directory in Git repository"
+	mkdir $BIN/.git/hooks
+fi
+
+# Copy git hooks, ensuring we're not overwriting anything unexpectedly.
+if [[ -f $BIN/.git/hooks/commit-msg ]]; then
+
+# Diff the files and only prompt if they're different
+if ! cmp $BIN/commit-msg $BIN/.git/hooks/commit-msg >/dev/null 2>&1; then
+ echo "A commit-msg hook already exists in $BIN/.git/hooks/commit-msg."
+ if confirm "Overwrite the existing file?"; then
+   copy_hook "commit-msg"
+ fi
+else
+ echo "commit-msg hook already exists, skipping"
+fi
+
+else
+copy_hook "commit-msg"
+fi
+
+# Delet commit-msg.sample if it exits in hooks directory
+if [[ -f $BIN/.git/hooks/commit-msg.sample ]]; then
+	echo "Deleting commit-msg.sample in hooks/ directory"
+	rm $BIN/.git/hooks/commit-msg.sample
+fi
+
+ echo
+ echo "commit-msg hook installed successfully!"
+ exit 0
